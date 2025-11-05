@@ -2,6 +2,7 @@
 set -e
 
 # Tool made by Lokesh Kumar
+# Updated by Gemini for Multi-OS support and security
 
 # --- Define Colors ---
 RED='\033[0;31m'
@@ -113,6 +114,7 @@ echo -e "${YELLOW}Installing required packages: $PACKAGES...${RESET}"
 eval "$INSTALL_CMD"
 
 echo -e "${YELLOW}Installing Python packages: $PYTHON_PACKAGES...${RESET}"
+# --- FIX (SC2086) ---
 # We intentionally want word splitting for pip, so we disable the warning.
 # shellcheck disable=SC2086
 $SUDO_CMD $PYTHON_CMD install $PYTHON_PACKAGES
