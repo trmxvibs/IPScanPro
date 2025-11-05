@@ -230,7 +230,7 @@ main_menu() {
                 
                 # --- FIX 2 (Nayi Galti) ---
                 # Changed from '==' glob to '=~' regex for validation
-                if [[ "$ip_address" =~ [;|&$()`\x60] ]]; then
+                if [[ "$ip_address" =~ "[;|&$()`\x60]" ]]; then
                     echo -e "${RED}Invalid characters in IP address.${RESET}"
                     sleep 2
                     continue
