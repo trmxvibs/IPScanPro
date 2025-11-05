@@ -20,9 +20,9 @@ CONFIG_FILE="$CONFIG_DIR/config"
 ACCESS_TOKEN=""
 
 # --- [SECURITY FIX] Load API Key ---
-if [ -f "$CONFIG_FILE" ];
-then
-    ACCESS_TOKEN=$(grep 'ACCESS_TOKEN=' "$CONFIG_FILE" | cut -d'=' -f2)
+if [ -f "$CONFIG_FILE" ]; then
+    # Read ACCESS_TOKEN; strip possible surrounding quotes and whitespace
+    ACCESS_TOKEN=$(grep -E '^ACCESS_TOKEN=' "$CONFIG_FILE" | head -n1 | cut -d'=' -f2- | tr -d '"' | xargs)
 fi
 
 # Exit if token is not found or is the default placeholder
@@ -37,7 +37,12 @@ fi
 display_banner() {
     clear
     echo -e "${CYAN}"
-    figlet -f slant "IP Scanner Pro" | lolcat
+    # figlet and lolcat may not be installed everywhere; ignore failure
+    if command -v figlet >/dev/null 2>&1; then
+        figlet -f slant "IP Scanner Pro" 2>/dev/null || true
+    else
+        echo "IP Scanner Pro"
+    fi
     echo -e "${GREEN}By Lokesh Kumar${RESET}"
     echo -e "${MAGENTA}---------------------------------${RESET}"
     echo -e "${YELLOW}Advanced IP Scanning Tool${RESET}"
@@ -59,7 +64,8 @@ import sys
 
 access_token = "$ACCESS_TOKEN"
 ip_address = "$ip_address"
-url = f"https.io/{ip_address}/json?token={access_token}"
+# FIX: correct ipinfo URL
+url = f"https://ipinfo.io/{ip_address}/json?token={access_token}"
 
 try:
     response = requests.get(url, timeout=5)
@@ -68,26 +74,27 @@ try:
     print(json.dumps(details))
 except requests.exceptions.HTTPError as e:
     # Provide more specific error messages
-    if e.response.status_code == 404:
+    status = getattr(e.response, "status_code", None)
+    if status == 404:
         print(json.dumps({"error": "IP address not found or private."}))
-    elif e.response.status_code == 401 or e.response.status_code == 403:
+    elif status in (401, 403):
         print(json.dumps({"error": "Invalid API Token. Check $CONFIG_FILE"}))
     else:
-        print(json.dumps({"error": f"API Error: {e.response.status_code}"}))
-except requests.RequestException as e:
+        print(json.dumps({"error": f"API Error: {status}"}))
+except requests.RequestException:
     print(json.dumps({"error": "Failed to connect. Check internet."}))
     sys.exit(1)
 END
 )
   
-    # Check if the request was successful
-    if echo "$result" | jq -e '.error' > /dev/null; then
+    # Check if the request returned an error object
+    if echo "$result" | jq -e '.error' > /dev/null 2>&1; then
         error_msg=$(echo "$result" | jq -r '.error')
         echo -e "${RED}Failed to fetch details: $error_msg${RESET}"
         return
     fi
 
-    # [IMPROVEMENT] Save formatted output
+    # Save formatted output
     formatted_output=$(echo "$result" | jq -r '
         "IP Address: \(.ip // "N/A")",
         "Hostname: \(.hostname // "N/A")",
@@ -107,15 +114,18 @@ END
     done
     echo -e "${GREEN}----------------------------${RESET}"
 
-    # [IMPROVEMENT] Save details to file (formatted text + raw JSON)
+    # Save details to file (formatted text + raw JSON)
     mkdir -p "$SAVE_DIR"
     filename="$SAVE_DIR/${ip_address}_Report.txt"
     
-    echo "--- IP Address Details ---" > "$filename"
-    echo "$formatted_output" >> "$filename"
-    echo "----------------------------" >> "$filename"
-    echo "\n--- Raw JSON Data ---" >> "$filename"
-    echo "$result" | jq . >> "$filename"
+    {
+      echo "--- IP Address Details ---"
+      echo "$formatted_output"
+      echo "----------------------------"
+      echo
+      echo "--- Raw JSON Data ---"
+      echo "$result" | jq .
+    } > "$filename"
 
     echo -e "${GREEN}Details saved to: ${filename}${RESET}"
 }
@@ -123,29 +133,26 @@ END
 # --- [IMPROVEMENT] Function to update the tool ---
 update_tool() {
     echo -e "${BLUE}Updating tool from GitHub...${RESET}"
-    if [ -d "$INSTALL_DIR/.git" ];
-    then
-        cd "$INSTALL_DIR"
+    if [ -d "$INSTALL_DIR/.git" ]; then
+        cd "$INSTALL_DIR" || return
         git pull origin main # Assuming 'main' branch
         echo -e "${GREEN}Update complete.${RESET}"
         
         # Copy the updated script back to the bin directory
         echo -e "${YELLOW}Applying updates...${RESET}"
-        if [[ $(uname -o) == "Android" ]];
-        then
+        if [[ $(uname -o 2>/dev/null) == "Android" ]]; then
             BIN_DIR="$PREFIX/bin"
             cp "ip" "$BIN_DIR/ip"
             chmod +x "$BIN_DIR/ip"
         else
             BIN_DIR="/usr/local/bin"
-            if command -v sudo &> /dev/null;
-            then
+            if command -v sudo &> /dev/null; then
                 sudo cp "ip" "$BIN_DIR/ip"
                 sudo chmod +x "$BIN_DIR/ip"
             else
                 # If sudo is not found, assume root
                 cp "ip" "$BIN_DIR/ip"
-                 chmod +x "$BIN_DIR/ip"
+                chmod +x "$BIN_DIR/ip"
             fi
         fi
         echo -e "${GREEN}Tool updated. Please restart the script.${RESET}"
@@ -161,39 +168,33 @@ remove_tool() {
     echo -e "${RED}Completely removing the tool...${RESET}"
     SUDO_CMD="sudo"
     
-    if [[ $(uname -o) == "Android" ]];
-    then
+    if [[ $(uname -o 2>/dev/null) == "Android" ]]; then
         BIN_DIR="$PREFIX/bin"
         SUDO_CMD=""
-    elif [[ -f /etc/debian_version ]] || [[ -f /etc/arch-release ]] || [[ -f /etc/fedora-release ]] || [[ $(uname -s) == "Darwin" ]];
-    then
+    elif [[ -f /etc/debian_version ]] || [[ -f /etc/arch-release ]] || [[ -f /etc/fedora-release ]] || [[ $(uname -s) == "Darwin" ]]; then
         BIN_DIR="/usr/local/bin"
     fi
 
     # Remove executable
-    if [ -f "$BIN_DIR/ip" ];
-    then
+    if [ -f "$BIN_DIR/ip" ]; then
         $SUDO_CMD rm -f "$BIN_DIR/ip"
         echo "Executable removed."
     fi
     
     # Remove cloned repo
-    if [ -d "$INSTALL_DIR" ];
-    then
+    if [ -d "$INSTALL_DIR" ]; then
         rm -rf "$INSTALL_DIR"
         echo "Repository removed."
     fi
 
     # Remove config file
-    if [ -d "$CONFIG_DIR" ];
-    then
+    if [ -d "$CONFIG_DIR" ]; then
         rm -rf "$CONFIG_DIR"
         echo "Config file removed."
     fi
 
     # Remove saved results
-    if [ -d "$SAVE_DIR" ];
-    then
+    if [ -d "$SAVE_DIR" ]; then
         rm -rf "$SAVE_DIR"
         echo "Scan results removed."
     fi
@@ -207,8 +208,8 @@ main_menu() {
         display_banner
         
         # Fetch and display user IP information
-        ipv4=$(curl -s -4 ifconfig.me)
-        ipv6=$(curl -s iff.me)
+        ipv4=$(curl -s -4 ifconfig.me || echo "N/A")
+        ipv6=$(curl -s -6 ifconfig.me || echo "N/A")   # FIX: use -6 and correct hostname
         echo -e "${RED}Your IPv4: ${CYAN}$ipv4${RESET}"
         echo -e "${RED}Your IPv6: ${CYAN}$ipv6${RESET}"
         
@@ -218,23 +219,27 @@ main_menu() {
         echo -e "${CYAN}3. Remove Tool${RESET}"
         echo -e "${CYAN}4. Exit${RESET}"
 
-        # --- FIX 1 (Puraani Galti) ---
-        # Removed the complex $(echo -e ...) wrapper
         read -p "${YELLOW}Enter your choice: ${RESET}" choice
 
         case $choice in
             1)
-                # --- FIX 1 (Puraani Galti) ---
-                # Removed the complex $(echo -e ...) wrapper
                 read -p "${YELLOW}Enter the IP address (v4 or v6): ${RESET}" ip_address
                 
-                # --- FIX 2 (Nayi Galti) ---
-                # Changed from '==' glob to '=~' regex for validation
-                if [[ "$ip_address" =~ "[;|&$()]" ]] || [[ "$ip_address" == *"`"* ]]; then
+                # FIX: Use an unquoted regex with =~ to avoid shell parsing of the backtick.
+                # This checks for any of these illegal characters: ; | & $ ( ) `
+                if [[ "$ip_address" =~ [;\|\&\$\(\)\`] ]]; then
                     echo -e "${RED}Invalid characters in IP address.${RESET}"
                     sleep 2
                     continue
                 fi
+
+                # Basic non-empty check
+                if [[ -z "$ip_address" ]]; then
+                    echo -e "${RED}IP address cannot be empty.${RESET}"
+                    sleep 1
+                    continue
+                fi
+
                 fetch_ip_details "$ip_address"
                 ;;
             2)
@@ -254,7 +259,7 @@ main_menu() {
                 ;;
         esac
         echo -e "\n${YELLOW}Press Enter to continue...${RESET}"
-        read
+        read -r
     done
 }
 
