@@ -219,8 +219,8 @@ main_menu() {
                 read -p "${YELLOW}Enter the IP address (v4 or v6): ${RESET}" ip_address
                 
                 # [SECURITY FIX] Basic validation to prevent command injection
-                if [[ "$ip_address" == *[';' '|' '&' '$' '(' ')' '`']* ]]; then
-                    echo -e "${RED}Invalid characters in IP address.${RESET}"
+if [[ "$ip_address" =~ [;|&$()`\x60] ]]; then
+echo -e "${RED}Invalid characters in IP address.${RESET}"
                     sleep 2
                     continue
                 fi
