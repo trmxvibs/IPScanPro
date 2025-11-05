@@ -227,12 +227,13 @@ main_menu() {
                 
                 # FIX: Use an unquoted regex with =~ to avoid shell parsing of the backtick.
                 # This checks for any of these illegal characters: ; | & $ ( ) `
-                if echo "$ip_address" | grep -qE '[;|&$()`]'; then
+                # Reject unsafe characters: ; | & $ ( ) `
+if echo "$ip_address" | grep -qE '[;|&$()`]'; then
+    echo -e "${RED}Invalid characters in IP address.${RESET}"
+    sleep 2
+    continue
+fi
 
-                    echo -e "${RED}Invalid characters in IP address.${RESET}"
-                    sleep 2
-                    continue
-                fi
 
                 # Basic non-empty check
                 if [[ -z "$ip_address" ]]; then
