@@ -1,5 +1,5 @@
 # 🚀 IP Scanner Pro
-
+  
 ![GitHub CI](https://github.com/trmxvibs/IPScanPro/actions/workflows/ci.yml/badge.svg)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 ![Version](https://img.shields.io/badge/Version-1.1.0-blue.svg)
