@@ -1,0 +1,27 @@
+```yaml
+# This is your GitHub Actions workflow file
+# It will give you the "green badge"
+
+name: CI
+# Run this workflow on every push and pull request
+on: [push, pull_request]
+
+jobs:
+  lint:
+    name: ShellCheck
+    runs-on: ubuntu-latest # Use a standard Linux runner
+    
+    steps:
+      # 1. Get the code from your repository
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # 2. Install ShellCheck (a tool to find bugs in Bash scripts)
+      - name: Install ShellCheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+
+      # 3. Run ShellCheck on your scripts
+      # If this command fails, your badge will turn red (failed)
+      # If it passes, your badge will turn green (passing)
+      - name: Run ShellCheck
+        run: shellcheck ip install.sh
