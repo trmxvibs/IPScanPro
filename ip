@@ -20,7 +20,8 @@ CONFIG_FILE="$CONFIG_DIR/config"
 ACCESS_TOKEN=""
 
 # --- [SECURITY FIX] Load API Key ---
-if [ -f "$CONFIG_FILE" ]; then
+if [ -f "$CONFIG_FILE" ];
+then
     ACCESS_TOKEN=$(grep 'ACCESS_TOKEN=' "$CONFIG_FILE" | cut -d'=' -f2)
 fi
 
@@ -58,7 +59,7 @@ import sys
 
 access_token = "$ACCESS_TOKEN"
 ip_address = "$ip_address"
-url = f"https://ipinfo.io/{ip_address}/json?token={access_token}"
+url = f"https.io/{ip_address}/json?token={access_token}"
 
 try:
     response = requests.get(url, timeout=5)
@@ -122,26 +123,29 @@ END
 # --- [IMPROVEMENT] Function to update the tool ---
 update_tool() {
     echo -e "${BLUE}Updating tool from GitHub...${RESET}"
-    if [ -d "$INSTALL_DIR/.git" ]; then
+    if [ -d "$INSTALL_DIR/.git" ];
+    then
         cd "$INSTALL_DIR"
         git pull origin main # Assuming 'main' branch
         echo -e "${GREEN}Update complete.${RESET}"
         
         # Copy the updated script back to the bin directory
         echo -e "${YELLOW}Applying updates...${RESET}"
-        if [[ $(uname -o) == "Android" ]]; then
+        if [[ $(uname -o) == "Android" ]];
+        then
             BIN_DIR="$PREFIX/bin"
             cp "ip" "$BIN_DIR/ip"
             chmod +x "$BIN_DIR/ip"
         else
             BIN_DIR="/usr/local/bin"
-            if command -v sudo &> /dev/null; then
+            if command -v sudo &> /dev/null;
+            then
                 sudo cp "ip" "$BIN_DIR/ip"
                 sudo chmod +x "$BIN_DIR/ip"
             else
                 # If sudo is not found, assume root
                 cp "ip" "$BIN_DIR/ip"
-                chmod +x "$BIN_DIR/ip"
+                 chmod +x "$BIN_DIR/ip"
             fi
         fi
         echo -e "${GREEN}Tool updated. Please restart the script.${RESET}"
@@ -157,33 +161,39 @@ remove_tool() {
     echo -e "${RED}Completely removing the tool...${RESET}"
     SUDO_CMD="sudo"
     
-    if [[ $(uname -o) == "Android" ]]; then
+    if [[ $(uname -o) == "Android" ]];
+    then
         BIN_DIR="$PREFIX/bin"
         SUDO_CMD=""
-    elif [[ -f /etc/debian_version ]] || [[ -f /etc/arch-release ]] || [[ -f /etc/fedora-release ]] || [[ $(uname -s) == "Darwin" ]]; then
+    elif [[ -f /etc/debian_version ]] || [[ -f /etc/arch-release ]] || [[ -f /etc/fedora-release ]] || [[ $(uname -s) == "Darwin" ]];
+    then
         BIN_DIR="/usr/local/bin"
     fi
 
     # Remove executable
-    if [ -f "$BIN_DIR/ip" ]; then
+    if [ -f "$BIN_DIR/ip" ];
+    then
         $SUDO_CMD rm -f "$BIN_DIR/ip"
         echo "Executable removed."
     fi
     
     # Remove cloned repo
-    if [ -d "$INSTALL_DIR" ]; then
+    if [ -d "$INSTALL_DIR" ];
+    then
         rm -rf "$INSTALL_DIR"
         echo "Repository removed."
     fi
 
     # Remove config file
-    if [ -d "$CONFIG_DIR" ]; then
+    if [ -d "$CONFIG_DIR" ];
+    then
         rm -rf "$CONFIG_DIR"
         echo "Config file removed."
     fi
 
     # Remove saved results
-    if [ -d "$SAVE_DIR" ]; then
+    if [ -d "$SAVE_DIR" ];
+    then
         rm -rf "$SAVE_DIR"
         echo "Scan results removed."
     fi
@@ -198,7 +208,7 @@ main_menu() {
         
         # Fetch and display user IP information
         ipv4=$(curl -s -4 ifconfig.me)
-        ipv6=$(curl -s ifconfig.me)
+        ipv6=$(curl -s iff.me)
         echo -e "${RED}Your IPv4: ${CYAN}$ipv4${RESET}"
         echo -e "${RED}Your IPv6: ${CYAN}$ipv6${RESET}"
         
@@ -208,19 +218,20 @@ main_menu() {
         echo -e "${CYAN}3. Remove Tool${RESET}"
         echo -e "${CYAN}4. Exit${RESET}"
 
-        # --- FIX (SC1073) ---
+        # --- FIX 1 (Puraani Galti) ---
         # Removed the complex $(echo -e ...) wrapper
         read -p "${YELLOW}Enter your choice: ${RESET}" choice
 
         case $choice in
             1)
-                # --- FIX (SC1073) ---
+                # --- FIX 1 (Puraani Galti) ---
                 # Removed the complex $(echo -e ...) wrapper
                 read -p "${YELLOW}Enter the IP address (v4 or v6): ${RESET}" ip_address
                 
-                # [SECURITY FIX] Basic validation to prevent command injection
-if [[ "$ip_address" =~ [;|&$()`\x60] ]]; then
-echo -e "${RED}Invalid characters in IP address.${RESET}"
+                # --- FIX 2 (Nayi Galti) ---
+                # Changed from '==' glob to '=~' regex for validation
+                if [[ "$ip_address" =~ [;|&$()`\x60] ]]; then
+                    echo -e "${RED}Invalid characters in IP address.${RESET}"
                     sleep 2
                     continue
                 fi
