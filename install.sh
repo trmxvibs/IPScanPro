@@ -113,6 +113,9 @@ echo -e "${YELLOW}Installing required packages: $PACKAGES...${RESET}"
 eval "$INSTALL_CMD"
 
 echo -e "${YELLOW}Installing Python packages: $PYTHON_PACKAGES...${RESET}"
+# --- FIX (SC2086) ---
+# We intentionally want word splitting for pip, so we disable the warning.
+# shellcheck disable=SC2086
 $SUDO_CMD $PYTHON_CMD install $PYTHON_PACKAGES
 
 # --- Clone/Install the tool ---
@@ -139,7 +142,9 @@ mkdir -p "$CONFIG_DIR"
 echo -e "\n${CYAN}--- API Key Setup (Required) ---${RESET}"
 echo -e "This tool uses ${GREEN}ipinfo.io${RESET}."
 echo -e "Please sign up on their website to get your FREE Access Token."
-read -p "Paste your ipinfo.io Access Token here: " access_token
+# --- FIX (SC2162) ---
+# Added -r to read to prevent backslashes from being mangled.
+read -r -p "Paste your ipinfo.io Access Token here: " access_token
 
 if [ -z "$access_token" ]; then
     echo -e "${RED}API Token not entered. Please add it to $CONFIG_FILE later.${RESET}"
