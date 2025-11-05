@@ -1,8 +1,7 @@
-```yaml
 # This is your GitHub Actions workflow file
 # It will give you the "green badge"
-
 name: CI
+
 # Run this workflow on every push and pull request
 on: [push, pull_request]
 
