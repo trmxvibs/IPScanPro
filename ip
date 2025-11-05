@@ -21,11 +21,9 @@ ACCESS_TOKEN=""
 
 # --- [SECURITY FIX] Load API Key ---
 if [ -f "$CONFIG_FILE" ]; then
-    # Read ACCESS_TOKEN; strip possible surrounding quotes and whitespace
     ACCESS_TOKEN=$(grep -E '^ACCESS_TOKEN=' "$CONFIG_FILE" | head -n1 | cut -d'=' -f2- | tr -d '"' | xargs)
 fi
 
-# Exit if token is not found or is the default placeholder
 if [ -z "$ACCESS_TOKEN" ] || [ "$ACCESS_TOKEN" == "YOUR_KEY_HERE" ]; then
     echo -e "${RED}Error: ipinfo.io API Token not found!${RESET}"
     echo -e "${YELLOW}Please create the ${CONFIG_FILE} file and add:${RESET}"
@@ -33,11 +31,10 @@ if [ -z "$ACCESS_TOKEN" ] || [ "$ACCESS_TOKEN" == "YOUR_KEY_HERE" ]; then
     exit 1
 fi
 
-# --- Function to display the banner ---
+# --- Function to display banner ---
 display_banner() {
     clear
     echo -e "${CYAN}"
-    # figlet and lolcat may not be installed everywhere; ignore failure
     if command -v figlet >/dev/null 2>&1; then
         figlet -f slant "IP Scanner Pro" 2>/dev/null || true
     else
@@ -56,24 +53,16 @@ fetch_ip_details() {
 
     echo -e "${YELLOW}Fetching IP details...${RESET}"
     
-    # Use Python to fetch IP details (Passing API Key as a variable)
     result=$(python3 - <<END
-import requests
-import json
-import sys
-
+import requests, json, sys
 access_token = "$ACCESS_TOKEN"
 ip_address = "$ip_address"
-# FIX: correct ipinfo URL
 url = f"https://ipinfo.io/{ip_address}/json?token={access_token}"
-
 try:
     response = requests.get(url, timeout=5)
     response.raise_for_status()
-    details = response.json()
-    print(json.dumps(details))
+    print(json.dumps(response.json()))
 except requests.exceptions.HTTPError as e:
-    # Provide more specific error messages
     status = getattr(e.response, "status_code", None)
     if status == 404:
         print(json.dumps({"error": "IP address not found or private."}))
@@ -87,14 +76,12 @@ except requests.RequestException:
 END
 )
   
-    # Check if the request returned an error object
-    if echo "$result" | jq -e '.error' > /dev/null 2>&1; then
+    if echo "$result" | jq -e '.error' >/dev/null 2>&1; then
         error_msg=$(echo "$result" | jq -r '.error')
         echo -e "${RED}Failed to fetch details: $error_msg${RESET}"
         return
     fi
 
-    # Save formatted output
     formatted_output=$(echo "$result" | jq -r '
         "IP Address: \(.ip // "N/A")",
         "Hostname: \(.hostname // "N/A")",
@@ -107,17 +94,14 @@ END
         "Timezone: \(.timezone // "N/A")"
     ')
 
-    # Print to screen with colors
     echo -e "${GREEN}--- IP Address Details ---${RESET}"
     echo "$formatted_output" | while IFS= read -r line; do
         echo -e "${CYAN}$line${RESET}"
     done
     echo -e "${GREEN}----------------------------${RESET}"
 
-    # Save details to file (formatted text + raw JSON)
     mkdir -p "$SAVE_DIR"
     filename="$SAVE_DIR/${ip_address}_Report.txt"
-    
     {
       echo "--- IP Address Details ---"
       echo "$formatted_output"
@@ -130,15 +114,14 @@ END
     echo -e "${GREEN}Details saved to: ${filename}${RESET}"
 }
 
-# --- [IMPROVEMENT] Function to update the tool ---
+# --- Function to update the tool ---
 update_tool() {
     echo -e "${BLUE}Updating tool from GitHub...${RESET}"
     if [ -d "$INSTALL_DIR/.git" ]; then
         cd "$INSTALL_DIR" || return
-        git pull origin main # Assuming 'main' branch
+        git pull origin main
         echo -e "${GREEN}Update complete.${RESET}"
         
-        # Copy the updated script back to the bin directory
         echo -e "${YELLOW}Applying updates...${RESET}"
         if [[ $(uname -o 2>/dev/null) == "Android" ]]; then
             BIN_DIR="$PREFIX/bin"
@@ -146,11 +129,10 @@ update_tool() {
             chmod +x "$BIN_DIR/ip"
         else
             BIN_DIR="/usr/local/bin"
-            if command -v sudo &> /dev/null; then
+            if command -v sudo &>/dev/null; then
                 sudo cp "ip" "$BIN_DIR/ip"
                 sudo chmod +x "$BIN_DIR/ip"
             else
-                # If sudo is not found, assume root
                 cp "ip" "$BIN_DIR/ip"
                 chmod +x "$BIN_DIR/ip"
             fi
@@ -163,7 +145,7 @@ update_tool() {
     sleep 3
 }
 
-# --- [IMPROVEMENT] Function to remove the tool ---
+# --- Function to remove the tool ---
 remove_tool() {
     echo -e "${RED}Completely removing the tool...${RESET}"
     SUDO_CMD="sudo"
@@ -175,25 +157,21 @@ remove_tool() {
         BIN_DIR="/usr/local/bin"
     fi
 
-    # Remove executable
     if [ -f "$BIN_DIR/ip" ]; then
         $SUDO_CMD rm -f "$BIN_DIR/ip"
         echo "Executable removed."
     fi
     
-    # Remove cloned repo
     if [ -d "$INSTALL_DIR" ]; then
         rm -rf "$INSTALL_DIR"
         echo "Repository removed."
     fi
 
-    # Remove config file
     if [ -d "$CONFIG_DIR" ]; then
         rm -rf "$CONFIG_DIR"
         echo "Config file removed."
     fi
 
-    # Remove saved results
     if [ -d "$SAVE_DIR" ]; then
         rm -rf "$SAVE_DIR"
         echo "Scan results removed."
@@ -202,14 +180,13 @@ remove_tool() {
     echo -e "${GREEN}Tool removed successfully!${RESET}"
 }
 
-# --- Function to display the main menu ---
+# --- Main Menu ---
 main_menu() {
     while true; do
         display_banner
         
-        # Fetch and display user IP information
         ipv4=$(curl -s -4 ifconfig.me || echo "N/A")
-        ipv6=$(curl -s -6 ifconfig.me || echo "N/A")   # FIX: use -6 and correct hostname
+        ipv6=$(curl -s -6 ifconfig.me || echo "N/A")
         echo -e "${RED}Your IPv4: ${CYAN}$ipv4${RESET}"
         echo -e "${RED}Your IPv6: ${CYAN}$ipv6${RESET}"
         
@@ -219,23 +196,19 @@ main_menu() {
         echo -e "${CYAN}3. Remove Tool${RESET}"
         echo -e "${CYAN}4. Exit${RESET}"
 
-        read -p "${YELLOW}Enter your choice: ${RESET}" choice
+        read -r -p "${YELLOW}Enter your choice: ${RESET}" choice
 
         case $choice in
             1)
-                read -p "${YELLOW}Enter the IP address (v4 or v6): ${RESET}" ip_address
+                read -r -p "${YELLOW}Enter the IP address (v4 or v6): ${RESET}" ip_address
                 
-                # FIX: Use an unquoted regex with =~ to avoid shell parsing of the backtick.
-                # This checks for any of these illegal characters: ; | & $ ( ) `
-                # Reject unsafe characters: ; | & $ ( ) `
-if echo "$ip_address" | grep -qE '[;|&$()`]'; then
-    echo -e "${RED}Invalid characters in IP address.${RESET}"
-    sleep 2
-    continue
-fi
+                # Validate input safely (ShellCheck clean)
+                if echo "$ip_address" | grep -qE "[;|&$()\`]" ; then
+                    echo -e "${RED}Invalid characters in IP address.${RESET}"
+                    sleep 2
+                    continue
+                fi
 
-
-                # Basic non-empty check
                 if [[ -z "$ip_address" ]]; then
                     echo -e "${RED}IP address cannot be empty.${RESET}"
                     sleep 1
