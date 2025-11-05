@@ -42,7 +42,7 @@ if [[ $(uname -o) == "Android" ]]; then
     SUDO_CMD="" # Termux doesn't use sudo
     BIN_DIR="$PREFIX/bin"
     # Required packages for Termux
-    PACKAGES="git python python3-pip curl wget figlet jq nmap coreutils"
+    PACKAGES="git python python-pip curl wget figlet jq nmap coreutils"
     PYTHON_PACKAGES="requests lolcat"
     PYTHON_CMD="pip"
 elif [[ -f /etc/debian_version ]]; then
