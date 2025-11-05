@@ -2,7 +2,7 @@
 set -e
 
 # Tool made by Lokesh Kumar
-# Updated   for Multi-OS support and security
+# Updated by Gemini for Multi-OS support and security
 
 # --- Define Colors ---
 RED='\033[0;31m'
@@ -209,11 +209,15 @@ main_menu() {
         echo -e "${CYAN}3. Remove Tool${RESET}"
         echo -e "${CYAN}4. Exit${RESET}"
 
-        read -p "$(echo -e ${YELLOW}Enter your choice: ${RESET})" choice
+        # --- FIX (SC1073) ---
+        # Removed the complex $(echo -e ...) wrapper
+        read -p "${YELLOW}Enter your choice: ${RESET}" choice
 
         case $choice in
             1)
-                read -p "$(echo -e ${YELLOW}Enter the IP address (v4 or v6): ${RESET})" ip_address
+                # --- FIX (SC1073) ---
+                # Removed the complex $(echo -e ...) wrapper
+                read -p "${YELLOW}Enter the IP address (v4 or v6): ${RESET}" ip_address
                 
                 # [SECURITY FIX] Basic validation to prevent command injection
                 if [[ "$ip_address" == *[';' '|' '&' '$' '(' ')' '`']* ]]; then
