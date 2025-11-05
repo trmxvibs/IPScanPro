@@ -19,6 +19,27 @@ CONFIG_DIR="$HOME/.config/ipscanner"
 CONFIG_FILE="$CONFIG_DIR/config"
 ACCESS_TOKEN=""
 
+# --- Quick dependency checks (informative only) ---
+# These checks do not install anything; they only provide helpful error messages.
+if ! command -v jq >/dev/null 2>&1; then
+    echo -e "${RED}Error: 'jq' is not installed.${RESET}"
+    echo -e "${YELLOW}Install it (Termux: pkg install jq, Debian/Ubuntu: sudo apt install jq)${RESET}"
+    exit 1
+fi
+
+if ! command -v python3 >/dev/null 2>&1; then
+    echo -e "${RED}Error: 'python3' is not installed.${RESET}"
+    echo -e "${YELLOW}Install it (Termux: pkg install python, Debian/Ubuntu: sudo apt install python3)${RESET}"
+    exit 1
+fi
+
+# check python requests module
+if ! python3 -c "import requests" >/dev/null 2>&1; then
+    echo -e "${RED}Error: Python module 'requests' is not installed.${RESET}"
+    echo -e "${YELLOW}Install it with: pip3 install requests${RESET}"
+    exit 1
+fi
+
 # --- [SECURITY FIX] Load API Key ---
 if [ -f "$CONFIG_FILE" ]; then
     ACCESS_TOKEN=$(grep -E '^ACCESS_TOKEN=' "$CONFIG_FILE" | head -n1 | cut -d'=' -f2- | tr -d '"' | xargs)
@@ -203,7 +224,9 @@ main_menu() {
                 read -r -p "${YELLOW}Enter the IP address (v4 or v6): ${RESET}" ip_address
                 
                 # Validate input safely (ShellCheck clean)
-                if echo "$ip_address" | grep -qE "[;|&$()\`]" ; then
+                # Reject these unsafe characters: ; | & $ ( ) `
+                # Using printf avoids locale/echo differences and the single-quoted regex prevents accidental expansion.
+                if printf '%s' "$ip_address" | grep -qE '[;|&$()`]' ; then
                     echo -e "${RED}Invalid characters in IP address.${RESET}"
                     sleep 2
                     continue
