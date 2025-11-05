@@ -2,7 +2,6 @@
 set -e
 
 # Tool made by Lokesh Kumar
-# Updated by Gemini for Multi-OS support and security
 
 # --- Define Colors ---
 RED='\033[0;31m'
