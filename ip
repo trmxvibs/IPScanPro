@@ -2,8 +2,9 @@
 set -e
 
 # Tool made by Lokesh Kumar
+# Updated   for Multi-OS support and security
 
-# Define colors
+# --- Define Colors ---
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[93m'
@@ -12,10 +13,27 @@ MAGENTA='\033[95m'
 BLUE='\033[94m'
 RESET='\033[0m'
 
-# Directory to save scan results
+# --- Define Paths ---
 SAVE_DIR="$HOME/IP_Scanner_Results"
+INSTALL_DIR="$HOME/.ipscanner"
+CONFIG_DIR="$HOME/.config/ipscanner"
+CONFIG_FILE="$CONFIG_DIR/config"
+ACCESS_TOKEN=""
 
-# Function to display the banner
+# --- [SECURITY FIX] Load API Key ---
+if [ -f "$CONFIG_FILE" ]; then
+    ACCESS_TOKEN=$(grep 'ACCESS_TOKEN=' "$CONFIG_FILE" | cut -d'=' -f2)
+fi
+
+# Exit if token is not found or is the default placeholder
+if [ -z "$ACCESS_TOKEN" ] || [ "$ACCESS_TOKEN" == "YOUR_KEY_HERE" ]; then
+    echo -e "${RED}Error: ipinfo.io API Token not found!${RESET}"
+    echo -e "${YELLOW}Please create the ${CONFIG_FILE} file and add:${RESET}"
+    echo -e "${CYAN}ACCESS_TOKEN=YOUR_KEY${RESET}"
+    exit 1
+fi
+
+# --- Function to display the banner ---
 display_banner() {
     clear
     echo -e "${CYAN}"
@@ -26,84 +44,155 @@ display_banner() {
     echo -e "${MAGENTA}---------------------------------${RESET}"
 }
 
-# Function to fetch and display IP details
+# --- Function to fetch and display IP details ---
 fetch_ip_details() {
     local ip_address=$1
     local result
 
-    # Use Python to fetch IP details
+    echo -e "${YELLOW}Fetching IP details...${RESET}"
+    
+    # Use Python to fetch IP details (Passing API Key as a variable)
     result=$(python3 - <<END
 import requests
 import json
+import sys
 
-access_token = "914d41abe9bb39"
+access_token = "$ACCESS_TOKEN"
 ip_address = "$ip_address"
 url = f"https://ipinfo.io/{ip_address}/json?token={access_token}"
 
 try:
-    response = requests.get(url)
+    response = requests.get(url, timeout=5)
     response.raise_for_status()
     details = response.json()
+    print(json.dumps(details))
+except requests.exceptions.HTTPError as e:
+    # Provide more specific error messages
+    if e.response.status_code == 404:
+        print(json.dumps({"error": "IP address not found or private."}))
+    elif e.response.status_code == 401 or e.response.status_code == 403:
+        print(json.dumps({"error": "Invalid API Token. Check $CONFIG_FILE"}))
+    else:
+        print(json.dumps({"error": f"API Error: {e.response.status_code}"}))
 except requests.RequestException as e:
-    print("ERROR")
-    exit(1)
-
-print(json.dumps(details))
+    print(json.dumps({"error": "Failed to connect. Check internet."}))
+    sys.exit(1)
 END
 )
-
+  
     # Check if the request was successful
-    if [[ "$result" == "ERROR" ]]; then
-        echo -e "${RED}Failed to fetch details for $ip_address.${RESET}"
+    if echo "$result" | jq -e '.error' > /dev/null; then
+        error_msg=$(echo "$result" | jq -r '.error')
+        echo -e "${RED}Failed to fetch details: $error_msg${RESET}"
         return
     fi
 
-    # Convert JSON response to readable format
+    # [IMPROVEMENT] Save formatted output
+    formatted_output=$(echo "$result" | jq -r '
+        "IP Address: \(.ip // "N/A")",
+        "Hostname: \(.hostname // "N/A")",
+        "City: \(.city // "N/A")",
+        "Region: \(.region // "N/A")",
+        "Country: \(.country // "N/A")",
+        "Location: \(.loc // "N/A")",
+        "Organization: \(.org // "N/A")",
+        "Postal Code: \(.postal // "N/A")",
+        "Timezone: \(.timezone // "N/A")"
+    ')
+
+    # Print to screen with colors
     echo -e "${GREEN}--- IP Address Details ---${RESET}"
-    echo "$result" | jq -r '
-        "\u001b[96mIP Address: \(.ip // "N/A")\u001b[0m",
-        "\u001b[96mHostname: \(.hostname // "N/A")\u001b[0m",
-        "\u001b[96mCity: \(.city // "N/A")\u001b[0m",
-        "\u001b[96mRegion: \(.region // "N/A")\u001b[0m",
-        "\u001b[96mCountry: \(.country // "N/A")\u001b[0m",
-        "\u001b[96mLocation: \(.loc // "N/A")\u001b[0m",
-        "\u001b[96mOrganization: \(.org // "N/A")\u001b[0m",
-        "\u001b[96mPostal Code: \(.postal // "N/A")\u001b[0m",
-        "\u001b[96mTimezone: \(.timezone // "N/A")\u001b[0m"
-    '
+    echo "$formatted_output" | while IFS= read -r line; do
+        echo -e "${CYAN}$line${RESET}"
+    done
     echo -e "${GREEN}----------------------------${RESET}"
 
-    # Save details to file
+    # [IMPROVEMENT] Save details to file (formatted text + raw JSON)
     mkdir -p "$SAVE_DIR"
     filename="$SAVE_DIR/${ip_address}_Report.txt"
-    echo "$result" | jq . > "$filename"
+    
+    echo "--- IP Address Details ---" > "$filename"
+    echo "$formatted_output" >> "$filename"
+    echo "----------------------------" >> "$filename"
+    echo "\n--- Raw JSON Data ---" >> "$filename"
+    echo "$result" | jq . >> "$filename"
+
     echo -e "${GREEN}Details saved to: ${filename}${RESET}"
 }
 
-# Function to update the tool
+# --- [IMPROVEMENT] Function to update the tool ---
 update_tool() {
-    echo -e "${BLUE}Updating tool...${RESET}"
-    for i in {0..100}; do
-        sleep 0.1
-        echo -ne "${YELLOW}Updating ====> $i%${RESET}\r"
-    done
-    echo -e "\n${GREEN}Tool is already up-to-date!${RESET}"
-    sleep 1
+    echo -e "${BLUE}Updating tool from GitHub...${RESET}"
+    if [ -d "$INSTALL_DIR/.git" ]; then
+        cd "$INSTALL_DIR"
+        git pull origin main # Assuming 'main' branch
+        echo -e "${GREEN}Update complete.${RESET}"
+        
+        # Copy the updated script back to the bin directory
+        echo -e "${YELLOW}Applying updates...${RESET}"
+        if [[ $(uname -o) == "Android" ]]; then
+            BIN_DIR="$PREFIX/bin"
+            cp "ip" "$BIN_DIR/ip"
+            chmod +x "$BIN_DIR/ip"
+        else
+            BIN_DIR="/usr/local/bin"
+            if command -v sudo &> /dev/null; then
+                sudo cp "ip" "$BIN_DIR/ip"
+                sudo chmod +x "$BIN_DIR/ip"
+            else
+                # If sudo is not found, assume root
+                cp "ip" "$BIN_DIR/ip"
+                chmod +x "$BIN_DIR/ip"
+            fi
+        fi
+        echo -e "${GREEN}Tool updated. Please restart the script.${RESET}"
+    else
+        echo -e "${RED}Installation directory $INSTALL_DIR not found.${RESET}"
+        echo -e "${YELLOW}Please reinstall using the installer script.${RESET}"
+    fi
+    sleep 3
 }
 
-# Function to remove the tool
+# --- [IMPROVEMENT] Function to remove the tool ---
 remove_tool() {
-    echo -e "${RED}Removing tool...${RESET}"
+    echo -e "${RED}Completely removing the tool...${RESET}"
+    SUDO_CMD="sudo"
+    
     if [[ $(uname -o) == "Android" ]]; then
         BIN_DIR="$PREFIX/bin"
-    elif [[ -f /etc/debian_version ]]; then
+        SUDO_CMD=""
+    elif [[ -f /etc/debian_version ]] || [[ -f /etc/arch-release ]] || [[ -f /etc/fedora-release ]] || [[ $(uname -s) == "Darwin" ]]; then
         BIN_DIR="/usr/local/bin"
     fi
-    rm -f "$BIN_DIR/ip"
+
+    # Remove executable
+    if [ -f "$BIN_DIR/ip" ]; then
+        $SUDO_CMD rm -f "$BIN_DIR/ip"
+        echo "Executable removed."
+    fi
+    
+    # Remove cloned repo
+    if [ -d "$INSTALL_DIR" ]; then
+        rm -rf "$INSTALL_DIR"
+        echo "Repository removed."
+    fi
+
+    # Remove config file
+    if [ -d "$CONFIG_DIR" ]; then
+        rm -rf "$CONFIG_DIR"
+        echo "Config file removed."
+    fi
+
+    # Remove saved results
+    if [ -d "$SAVE_DIR" ]; then
+        rm -rf "$SAVE_DIR"
+        echo "Scan results removed."
+    fi
+
     echo -e "${GREEN}Tool removed successfully!${RESET}"
 }
 
-# Function to display the main menu
+# --- Function to display the main menu ---
 main_menu() {
     while true; do
         display_banner
@@ -115,40 +204,39 @@ main_menu() {
         echo -e "${RED}Your IPv6: ${CYAN}$ipv6${RESET}"
         
         echo -e "${MAGENTA}\nMain Menu:${RESET}"
-        echo -e "${CYAN}1. Scan IPv4${RESET}"
-        echo -e "${CYAN}2. Scan IPv6${RESET}"
-        echo -e "${CYAN}3. Update Tool${RESET}"
-        echo -e "${CYAN}4. Remove Tool${RESET}"
-        echo -e "${CYAN}5. Exit${RESET}"
+        echo -e "${CYAN}1. Scan IPv4 / IPv6${RESET}"
+        echo -e "${CYAN}2. Update Tool${RESET}"
+        echo -e "${CYAN}3. Remove Tool${RESET}"
+        echo -e "${CYAN}4. Exit${RESET}"
 
         read -p "$(echo -e ${YELLOW}Enter your choice: ${RESET})" choice
 
         case $choice in
             1)
-                read -p "$(echo -e ${YELLOW}Enter the IPv4 address: ${RESET})" ip_address
-                if [[ ! $ip_address =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-                    echo -e "${RED}Invalid IPv4 address format.${RESET}"
+                read -p "$(echo -e ${YELLOW}Enter the IP address (v4 or v6): ${RESET})" ip_address
+                
+                # [SECURITY FIX] Basic validation to prevent command injection
+                if [[ "$ip_address" == *[';' '|' '&' '$' '(' ')' '`']* ]]; then
+                    echo -e "${RED}Invalid characters in IP address.${RESET}"
+                    sleep 2
                     continue
                 fi
                 fetch_ip_details "$ip_address"
                 ;;
             2)
-                read -p "$(echo -e ${YELLOW}Enter the IPv6 address: ${RESET})" ip_address
-                fetch_ip_details "$ip_address"
-                ;;
-            3)
                 update_tool
                 ;;
-            4)
+            3)
                 remove_tool
                 exit 0
                 ;;
-            5)
+            4)
                 echo -e "${RED}Exiting...${RESET}"
                 exit 0
                 ;;
             *)
                 echo -e "${RED}Invalid choice, please try again.${RESET}"
+                sleep 1
                 ;;
         esac
         echo -e "\n${YELLOW}Press Enter to continue...${RESET}"
